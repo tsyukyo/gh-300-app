@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="GH-300">
+<meta name="theme-color" content="#f3f5f4">
+<title>GH-300 学習（モックアップ）</title>
+<style>
+:root{--bg:#f3f5f4;--card:#fff;--ink:#14231f;--sub:#62706b;--line:#e3e8e6;--pri:#0f5c52;--pri2:#0b4038;--acc:#e08a00;--ok:#1a8f5a;--ng:#d6453d;--okbg:#e6f5ee;--ngbg:#fdeceb;--r:18px}
+@media(prefers-color-scheme:dark){:root{--bg:#0e1513;--card:#17211e;--ink:#e8efec;--sub:#8fa19b;--line:#26332f;--pri:#3fb5a2;--pri2:#2c8f7f;--okbg:#12352a;--ngbg:#3a1a18}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#cfd6d3;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;color:var(--ink)}
+#app{position:relative;max-width:430px;height:100dvh;margin:0 auto;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+@media(min-width:500px){#app{height:min(900px,100dvh);margin-top:max(0px,calc((100dvh - 900px)/2));border-radius:36px;box-shadow:0 20px 60px #0003}}
+header{display:flex;align-items:center;gap:10px;padding:max(env(safe-area-inset-top),14px) 16px 10px;min-height:64px}
+header h1{flex:1;margin:0;font-size:17px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ib{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;font-size:18px;color:var(--ink);cursor:pointer;flex:none}
+.tb{height:44px;padding:0 16px;border-radius:22px;border:1px solid var(--line);background:var(--card);color:var(--acc);font-weight:700;font-size:14px;cursor:pointer;flex:none}
+main{flex:1;overflow-y:auto;padding:4px 16px 24px;-webkit-overflow-scrolling:touch}
+.card{background:var(--card);border-radius:var(--r);padding:16px;margin-bottom:14px;box-shadow:0 1px 3px #0000000d}
+.card h3{margin:0 0 8px;font-size:13px;color:var(--sub);font-weight:600}
+.hero{background:linear-gradient(135deg,#0f3f38,#1c6a5e);color:#fff;border-radius:24px;padding:20px;display:flex;gap:16px;align-items:center}
+.hero .big{font-size:34px;font-weight:800}.hero small{opacity:.7}
+.bar{height:6px;border-radius:3px;background:#0002;overflow:hidden;margin-top:8px}.bar i{display:block;height:100%;background:#7ee0c3;border-radius:3px;transition:width .4s}
+.light .bar{background:var(--line)}.light .bar i{background:var(--pri)}
+.ring{width:84px;height:84px;border-radius:50%;border:7px solid #ffffff30;display:grid;place-items:center;font-weight:800;flex:none}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:54px;border-radius:16px;border:2px solid var(--pri);background:var(--pri);color:#fff;font-size:16px;font-weight:700;cursor:pointer;transition:transform .12s}
+.btn:active{transform:scale(.98)}.btn.ghost{background:var(--card);color:var(--pri)}.btn[disabled]{background:#8a9894;border-color:#8a9894;opacity:.6;pointer-events:none}
+.dock{padding:10px 16px max(env(safe-area-inset-bottom),14px);background:var(--bg);border-top:1px solid var(--line);display:flex;gap:10px;flex-direction:column}
+.dock .row{display:flex;gap:10px}
+.sec{display:flex;align-items:center;justify-content:space-between;margin:20px 2px 8px;font-weight:700}
+.sec span:last-child{color:var(--sub);font-size:13px}
+.item{display:flex;align-items:center;gap:12px;cursor:pointer}
+.num{width:38px;height:38px;border-radius:50%;background:var(--line);display:grid;place-items:center;font-weight:700;flex:none}
+.item .t{flex:1}.item .t b{display:block;font-size:15px}.item .t small{color:var(--sub);font-size:12px}
+.pct{color:var(--acc);font-weight:700;text-align:right;font-size:15px}.pct small{display:block;color:var(--sub);font-weight:400;font-size:11px}
+.opt{display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.opt:last-child{border:0}.opt b{display:block}.opt small{color:var(--sub);font-size:12px}
+.radio{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);flex:none;margin-left:auto}
+.on .radio{border:7px solid var(--pri)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:10px 16px;border-radius:22px;border:1px solid var(--line);background:var(--card);font-size:15px;cursor:pointer}
+.chip.on{background:var(--pri);color:#fff;border-color:var(--pri);font-weight:700}
+.tag{display:inline-block;background:var(--pri);color:#fff;border-radius:14px;padding:5px 12px;font-size:12px;font-weight:600}
+.meta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--sub);margin:10px 0}.meta .sp{flex:1}
+.q{font-weight:700;font-size:16px;line-height:1.6}
+.ans{display:flex;gap:12px;align-items:center;background:var(--card);border:2px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color .15s,background .15s}
+.ans .k{width:36px;height:36px;border-radius:50%;background:var(--line);display:grid;place-items:center;font-weight:700;flex:none}
+.ans.sel{border-color:var(--pri)}.ans.sel .k{background:var(--pri);color:#fff}
+.ans.ok{border-color:var(--ok);background:var(--okbg)}.ans.ok .k{background:var(--ok);color:#fff}
+.ans.ng{border-color:var(--ng);background:var(--ngbg)}.ans.ng .k{background:var(--ng);color:#fff}
+.exp{background:var(--card);border-left:4px solid var(--pri);border-radius:12px;padding:14px;font-size:14px;line-height:1.7;margin-top:6px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.stats .card{text-align:center;margin:0}.stats b{font-size:22px;display:block;margin:6px 0 2px}.stats small{color:var(--sub)}
+.timer{display:flex;justify-content:space-between;background:var(--card);border-radius:12px;padding:10px 14px;font-weight:700;font-variant-numeric:tabular-nums}
+.pill{font-size:11px;background:#4cc38a22;color:var(--ok);padding:2px 8px;border-radius:10px;margin-left:6px}
+.lock{opacity:.55}
+.toast{position:absolute;left:50%;bottom:90px;transform:translateX(-50%);background:#000c;color:#fff;padding:10px 16px;border-radius:20px;font-size:13px;animation:t 2s forwards;pointer-events:none}
+@keyframes t{0%{opacity:0}10%,80%{opacity:1}100%{opacity:0}}
+.screen{animation:in .22s ease-out}@keyframes in{from{opacity:0;transform:translateX(12px)}}
+@media(prefers-reduced-motion:reduce){.screen,.bar i{animation:none;transition:none}}
+.note{font-size:11px;color:var(--sub);text-align:center;padding:8px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ---- サンプルデータ（モック用のオリジナル問題。本物の試験問題ではない） ----
+const SECTIONS=[
+ {d:'責任ある AI の活用',ic:'🛡',items:[{id:1,n:'責任ある AI の原則',total:45,done:10,rate:70},{id:2,n:'AI 出力の検証と運用',total:45,done:0}]},
+ {d:'Copilot 機能の活用',ic:'✨',items:[{id:3,n:'IDE での Copilot 活用',total:30,done:0},{id:4,n:'Copilot Chat と CLI',total:30,done:0}]},
+ {d:'プロンプトエンジニアリング',ic:'✍️',items:[{id:5,n:'効果的なプロンプト',total:40,done:0}]}];
+const QS=[
+ {id:'Q_00001',tag:'責任ある AI の活用',q:'生成 AI ツールの文脈で「ハルシネーション」とは何を指しますか？',o:['範囲外の質問をモデルが拒否すること','もっともらしいが事実として不正確な出力を生成すること','ライセンスのあるコードを逐語的に再現すること','コンテキストが大きいと応答が遅くなること'],a:1,e:'ハルシネーションは、自信ありげに見えて事実と異なる内容を生成する現象です。生成結果は必ずレビュー・テストで検証します。'},
+ {id:'Q_00002',tag:'責任ある AI の活用',q:'Copilot が提案したコードを採用する前に最も適切な行動はどれですか？',o:['そのままコミットする','内容を理解しレビューとテストを行う','提案を無視して手書きする','チャット履歴を削除する'],a:1,e:'提案は「下書き」です。採用の責任は開発者にあるため、レビューとテストが基本です。'},
+ {id:'Q_00143',tag:'Copilot 機能の活用',q:'Chat でファイルをコンテキストに含めたいとき、一般的な方法はどれですか？（サンプル問題）',o:['プロンプトでファイルを参照する','毎回すべて貼り付ける','設定ファイルを再起動する','ファイルは参照できない'],a:0,e:'モックアップ用の仮解説です。実装時は公式ドキュメントに基づく問題を用意します。'}];
+const L='ABCD';
+// ---- state ----
+const S={route:'home',mode:'seq',lang:'sel',chunk:'all',n:30,min:60,ratio:'official',qi:0,sel:null,done:false,exam:{ans:{},flag:{},qi:0,left:3600},paused:null,bm:{}};
+const $=s=>document.querySelector(s),app=$('#app');
+const go=r=>{S.route=r;render()};
+const toast=m=>{const t=document.createElement('div');t.className='toast';t.textContent=m;app.append(t);setTimeout(()=>t.remove(),2000)};
+const back=(to,ic='‹')=>`<button class="ib" onclick="go('${to}')" aria-label="戻る">${ic}</button>`;
+const opt=(grp,val,cur,ic,t,s)=>`<div class="opt ${cur===val?'on':''}" onclick="S.${grp}='${val}';render()"><span>${ic}</span><div><b>${t}</b><small>${s}</small></div><span class="radio"></span></div>`;
+let tick;
+function fmt(s){const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return [h,m,s%60].map(x=>String(x).padStart(2,'0')).join(':')}
+// ---- screens ----
+const V={
+home:()=>`<header><button class="ib" onclick="toast('設定（モック）')">⚙</button><h1>GH-300 Copilot</h1><button class="ib" onclick="toast('統計（モック）')">📊</button><button class="ib" onclick="toast('ブックマーク（モック）')">🔖</button></header>
+<main><div class="hero"><div style="flex:1"><div class="big">7<small> / 500</small></div><small>学習済みの問題</small><div class="bar"><i style="width:2%"></i></div><small>10 問解答済み・模擬試験 0 回</small></div><div class="ring">--</div></div>
+<div style="height:14px"></div><button class="btn" onclick="go(S.paused?'paused':'examcfg')">🎯 模擬試験</button>
+${SECTIONS.map(s=>`<div class="sec"><span>${s.ic} ${s.d}</span><span>${Math.round(s.items.reduce((a,b)=>a+b.done,0)/s.items.reduce((a,b)=>a+b.total,0)*100)}%</span></div>${s.items.map(i=>`<div class="card item" onclick="go('study')"><div class="num">${i.id}</div><div class="t"><b>${i.n}</b><small>${i.total} 問 / ${i.done} 解答済み</small><div class="bar light"><i style="width:${i.done/i.total*100}%"></i></div></div>${i.rate?`<div class="pct">${i.rate}%<small>正答率</small></div>`:''}<span style="color:var(--sub)">›</span></div>`).join('')}`).join('')}
+<div class="note">※ モックアップ。表示データはサンプルです</div></main>`,
+
+study:()=>`<header>${back('home')}<h1>学習</h1><span style="width:44px"></span></header><main>
+<div class="card"><h3>学習モード</h3>${[['seq','📋','順番通り','セクション内の問題を順番に'],['new','✨','未学習','まだ解答していない問題のみ'],['wrong','⚠️','最近不正解','最近間違えた問題'],['wrong3','🔁','直近3回で不正解','過去3回中1回以上間違えた問題'],['bm','🔖','ブックマーク','ブックマークした問題']].map(a=>opt('mode',a[0],S.mode,a[1],a[2],a[3])).join('')}</div>
+<div class="card"><h3>言語モード</h3>${[['sel','💬','選択言語','選択した言語で表示'],['en','🅰️','英語のみ','英語のみで表示'],['bi','🌐','バイリンガル','日本語と英語を併記']].map(a=>opt('lang',a[0],S.lang,a[1],a[2],a[3])).join('')}</div>
+<div class="card"><h3>学習チャンク</h3>${[['all','すべて（45問）',''],['c1','Q_00001 – Q_00010','前回 70%'],['c2','Q_00011 – Q_00020','']].map(c=>`<div class="opt ${S.chunk===c[0]?'on':''}" onclick="S.chunk='${c[0]}';render()"><div><b>${c[1]}</b></div><small style="margin-left:auto;color:var(--acc)">${c[2]}</small><span class="radio" ${c[2]?'':'style="margin-left:auto"'}></span></div>`).join('')}</div></main>
+<div class="dock"><button class="btn" onclick="S.qi=0;S.sel=null;S.done=false;go('q')">▶ はじめる</button></div>`,
+
+q:()=>{const q=QS[S.qi];const bm=S.bm[q.id];return `<header>${back('home','⌂')}<h1>責任ある AI の原則</h1><button class="tb" onclick="go('home')">終了</button></header><main>
+<div class="timer" style="font-weight:500;color:var(--sub)"><span>${S.qi+1} / ${QS.length}</span></div><div class="bar light" style="margin:8px 0 12px"><i style="width:${(S.qi+1)/QS.length*100}%"></i></div>
+<div class="meta"><span class="tag">${q.tag}</span><span class="sp"></span>${q.id}<span onclick="S.bm['${q.id}']=!S.bm['${q.id}'];render()" style="font-size:20px;cursor:pointer">${bm?'🔖':'📑'}</span></div>
+<div class="card q">${q.q}</div>
+${q.o.map((t,i)=>`<div class="ans ${S.done?(i===q.a?'ok':i===S.sel?'ng':''):S.sel===i?'sel':''}" onclick="if(!S.done){S.sel=${i};render()}"><span class="k">${L[i]}</span><span>${t}</span></div>`).join('')}
+${S.done?`<div class="exp"><b>${S.sel===q.a?'✅ 正解':'❌ 不正解（正解: '+L[q.a]+'）'}</b><br>${q.e}</div>`:''}</main>
+<div class="dock">${S.done?`<button class="btn" onclick="${S.qi<QS.length-1?'S.qi++;S.sel=null;S.done=false;render()':`toast('学習セッション完了（モック）');go('home')`}">${S.qi<QS.length-1?'次の問題へ':'完了'}</button>`:`<button class="btn" ${S.sel==null?'disabled':''} onclick="S.done=true;render()">回答する</button>`}</div>`},
+
+examcfg:()=>`<header>${back('home')}<h1>模擬試験 設定</h1><span style="width:44px"></span></header><main>
+<div class="card"><h3>出題数</h3><div class="chips">${[10,20,30,60].map(n=>`<div class="chip ${S.n===n?'on':''}" onclick="S.n=${n};render()">${n} 問</div>`).join('')}</div></div>
+<div class="card"><h3>制限時間</h3><div class="chips">${[30,60,100].map(n=>`<div class="chip ${S.min===n?'on':''}" onclick="S.min=${n};render()">${n} 分</div>`).join('')}</div><small style="color:var(--sub);display:block;margin-top:10px">本試験: 60 問 / 100 分 / 合格 700/1000（要確認）</small></div>
+<div class="card"><h3>ドメイン比率</h3>${opt('ratio','official',S.ratio,'📐','公式配分<span class="pill">推奨</span>','D1:18% D2:28% D3:13% D4:13% D5:14% D6:14%')}${opt('ratio','even',S.ratio,'⚖️','均等','6 ドメイン均等')}</div>
+<div class="card"><h3>言語モード</h3>${[['sel','💬','選択言語','選択した言語で表示'],['en','🅰️','英語のみ','英語のみで表示']].map(a=>opt('lang',a[0],S.lang,a[1],a[2],a[3])).join('')}</div></main>
+<div class="dock"><button class="btn" onclick="startExam()">▶ 試験開始</button></div>`,
+
+exam:()=>{const e=S.exam,q=QS[e.qi%QS.length],a=e.ans[e.qi];return `<header><button class="ib" onclick="toast('言語切替（モック）')">🌐</button><h1>模擬試験</h1><button class="ib" onclick="pause()" aria-label="中断">⏸</button></header><main>
+<div class="timer"><span>⏱ <span id="tm">${fmt(e.left)}</span></span><span style="color:var(--sub)">${e.qi+1} / ${S.n}</span></div>
+<div class="meta"><span class="tag">${q.tag}</span><span class="sp"></span>${q.id}<span onclick="toast('問題一覧（モック）')" style="font-size:18px">▦</span><span onclick="S.exam.flag[${e.qi}]=!S.exam.flag[${e.qi}];render()" style="font-size:18px">${e.flag[e.qi]?'🚩':'⚑'}</span></div>
+<div class="card q">${q.q}</div>
+${q.o.map((t,i)=>`<div class="ans ${a===i?'sel':''}" onclick="S.exam.ans[${e.qi}]=${i};render()"><span class="k">${L[i]}</span><span>${t}</span></div>`).join('')}</main>
+<div class="dock"><div class="row"><button class="btn ghost" ${e.qi==0?'disabled':''} onclick="S.exam.qi--;render()">前へ</button><button class="btn" onclick="${e.qi<S.n-1?'S.exam.qi++;render()':`toast('採点画面へ（モック）');stopTick();go('home')`}">${e.qi<S.n-1?'次へ':'採点する'}</button></div></div>`},
+
+paused:()=>{const e=S.exam,n=Object.keys(e.ans).length,used=Math.round((S.min*60-e.left)/60);return `<header>${back('home')}<h1>中断中の試験</h1><span style="width:44px"></span></header><main>
+<div class="card" style="text-align:center"><div class="bar light"><i style="width:${n/S.n*100}%"></i></div><b style="font-size:20px;display:block;margin-top:14px">${n} / ${S.n}</b></div>
+<div class="stats"><div class="card">✅<b>${n}</b><small>回答済</small></div><div class="card">⏱<b>${used}分</b><small>経過時間</small></div><div class="card">⏳<b>${Math.ceil(e.left/60)}分</b><small>残り</small></div></div>
+<p class="note">${S.paused} に中断</p><button class="btn" onclick="resume()">▶ 試験を再開</button><div style="height:10px"></div><button class="btn ghost" onclick="S.paused=null;go('examcfg')">新しい試験を開始</button></main>`}
+};
+function startExam(){stopTick();S.exam={ans:{},flag:{},qi:0,left:S.min*60};S.paused=null;go('exam');runTick()}
+function runTick(){stopTick();tick=setInterval(()=>{S.exam.left--;const t=$('#tm');if(t)t.textContent=fmt(S.exam.left);if(S.exam.left<=0){stopTick();toast('時間切れ（モック）');go('home')}},1000)}
+function stopTick(){clearInterval(tick)}
+function pause(){stopTick();const d=new Date();S.paused=`${d.getMonth()+1}月${d.getDate()}日 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;go('paused')}
+function resume(){go('exam');runTick()}
+function render(){app.innerHTML=`<div class="screen" style="display:flex;flex-direction:column;height:100%;min-height:0">${V[S.route]()}</div>`;const m=app.querySelector('main');if(m&&S._sc){}}
+render();
+</script>
+</body>
+</html>
