@@ -5,7 +5,7 @@ const DB={
   async get(k){const d=await this.open();return new Promise((res,rej)=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
   async set(k,v){const d=await this.open();return new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
 };
-const S={route:'home',Q:[],P:{hist:{},bm:{}},ses:null,cfg:{mode:'seq',shuffle:false,sec:'all'},msg:''};
+const S={route:'home',Q:[],P:{hist:{},bm:{},exams:[]},E:null,ex:{n:30,min:60},rv:null,ses:null,cfg:{mode:'seq',shuffle:false,sec:'all'},msg:''};
 const $app=document.getElementById('app');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/^\s*- /gm,'• ').replace(/\n/g,'<br>');
@@ -16,6 +16,12 @@ function toast(m){const t=document.createElement('div');t.className='toast';t.te
 const lastOk=id=>{const h=S.P.hist[id];return h&&h.length?h[h.length-1]:null};
 const tests=()=>[...new Set(S.Q.map(q=>q.test))].sort((a,b)=>a-b);
 const stat=qs=>{let d=0,ok=0;for(const q of qs){const h=S.P.hist[q.id];if(h&&h.length){d++;if(h[h.length-1])ok++}}return{total:qs.length,done:d,rate:d?Math.round(ok/d*100):null}};
+const fmt=t=>[Math.floor(t/3600),Math.floor(t%3600/60),t%60].map(x=>String(x).padStart(2,'0')).join(':');
+const byId=id=>S.Q.find(q=>q.id===id);
+const isOk=(q,sel)=>!!sel&&sel.length===q.answer.length&&q.answer.every(a=>sel.includes(a));
+const saveE=()=>DB.set('exam',S.E);
+let tick=null;
+const stopTick=()=>{clearInterval(tick);tick=null};
 const back=to=>`<button class="ib" onclick="go('${to}')" aria-label="戻る">‹</button>`;
 
 // ---- 学習対象の選別 ----
@@ -41,6 +47,37 @@ function submit(){const s=S.ses,q=s.qs[s.i];if(!s.sel.length)return;
 function next(){const s=S.ses;if(s.i<s.qs.length-1){s.i++;s.sel=[];s.done=false;render()}else go('result')}
 function bm(id){S.P.bm[id]?delete S.P.bm[id]:S.P.bm[id]=true;save();render()}
 
+
+// ---- 模擬試験 ----
+function startExam(){
+  if(!S.Q.length){toast('問題データがありません');return}
+  const a=[...S.Q];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
+  const ids=a.slice(0,Math.min(S.ex.n,a.length)).map(q=>q.id);
+  S.E={ids,ans:{},flag:{},i:0,left:S.ex.min*60,total:S.ex.min*60,paused:false,at:Date.now()};
+  saveE();go('exam');runTick()}
+function runTick(){stopTick();let c=0;tick=setInterval(()=>{if(!S.E)return stopTick();S.E.left--;c++;
+  const t=document.getElementById('tm');if(t)t.textContent=fmt(S.E.left);
+  if(c%5===0)saveE();if(S.E.left<=0){toast('時間切れです');finishExam(true)}},1000)}
+function exAns(i){const E=S.E,q=byId(E.ids[E.i]);let sel=E.ans[E.i]||[];
+  if(q.answer.length>1){sel=sel.includes(i)?sel.filter(x=>x!==i):[...sel,i]}else sel=[i];
+  E.ans[E.i]=sel;saveE();render()}
+function exMove(d){S.E.i=Math.max(0,Math.min(S.E.ids.length-1,S.E.i+d));saveE();render()}
+function exFlag(){const E=S.E;E.flag[E.i]=!E.flag[E.i];saveE();render()}
+function pauseExam(){stopTick();S.E.paused=true;S.E.pausedAt=Date.now();saveE();go('paused')}
+function resumeExam(){S.E.paused=false;saveE();go('exam');runTick()}
+function finishExam(force){
+  const E=S.E;if(!E)return;
+  const un=E.ids.length-Object.keys(E.ans).length;
+  if(!force&&un>0&&!confirm(`未回答が ${un} 問あります。採点しますか？`))return;
+  stopTick();let ok=0;
+  E.ids.forEach((id,i)=>{const q=byId(id),sel=E.ans[i],r=isOk(q,sel);if(r)ok++;
+    if(sel){(S.P.hist[id]=S.P.hist[id]||[]).push(r);if(S.P.hist[id].length>20)S.P.hist[id].shift()}});
+  const rec={at:Date.now(),n:E.ids.length,ok,used:E.total-E.left,ids:E.ids,ans:E.ans};
+  S.P.exams=S.P.exams||[];S.P.exams.push({at:rec.at,n:rec.n,ok,used:rec.used});
+  S.rv=rec;S.E=null;DB.set('exam',null);save();go('examresult')}
+function reviewQ(i){S.rv.cur=i;go('review')}
+function discardExam(){if(confirm('中断中の試験を破棄しますか？')){stopTick();S.E=null;DB.set('exam',null);go('examcfg')}}
+
 // ---- 読み込み ----
 async function importFiles(files){
   let add=0;const map=new Map(S.Q.map(q=>[q.id,q]));
@@ -55,7 +92,7 @@ async function importFiles(files){
 document.getElementById('file').addEventListener('change',e=>{if(e.target.files.length)importFiles([...e.target.files]);e.target.value=''});
 const pickFile=()=>document.getElementById('file').click();
 async function wipe(what){
-  if(what==='progress'&&confirm('学習履歴とブックマークを消去しますか？')){S.P={hist:{},bm:{}};await save();toast('履歴を消去しました')}
+  if(what==='progress'&&confirm('学習履歴とブックマークを消去しますか？')){S.P={hist:{},bm:{},exams:[]};await save();toast('履歴を消去しました')}
   if(what==='data'&&confirm('読み込んだ問題データを削除しますか？')){S.Q=[];await DB.set('questions',[]);toast('問題データを削除しました')}
   render()}
 
@@ -64,13 +101,13 @@ const V={
 home(){
   if(!S.Q.length)return `<header><span style="width:44px"></span><h1>GH-300 学習</h1><button class="ib" onclick="go('settings')" aria-label="設定">⚙</button></header>
   <main><div class="empty"><div style="font-size:48px">📚</div><h2>問題データがありません</h2><p>問題JSONファイルを読み込むと学習を始められます。</p><div style="height:12px"></div><button class="btn" onclick="pickFile()">問題JSONを読み込む</button></div></main>`;
-  const all=stat(S.Q),pct=all.total?all.done/all.total*100:0;
+  const all=stat(S.Q),pct=all.total?all.done/all.total*100:0,ex=S.P.exams||[],exr=ex.length?Math.round(ex.reduce((a,e)=>a+e.ok/e.n,0)/ex.length*100):null;
   return `<header><button class="ib" onclick="go('settings')" aria-label="設定">⚙</button><h1>GH-300 学習</h1><button class="ib" onclick="S.cfg.mode='bm';S.cfg.sec='all';go('study')" aria-label="ブックマーク">🔖</button></header>
-  <main><div class="hero"><div style="flex:1"><div class="big">${all.done}<small> / ${all.total}</small></div><small>学習済みの問題</small><div class="bar"><i style="width:${pct}%"></i></div><small>${Math.round(pct)}% 完了</small></div><div class="ring">${all.rate==null?'--':all.rate+'%'}</div></div>
-  <div style="height:14px"></div><button class="btn" onclick="S.cfg.sec='all';S.cfg.mode='seq';go('study')">▶ 全問題を学習</button>
+  <main><div class="hero"><div style="flex:1"><div class="big">${all.done}<small> / ${all.total}</small></div><small>学習済みの問題</small><div class="bar"><i style="width:${pct}%"></i></div><small>${Math.round(pct)}% 完了</small></div><div style="text-align:center"><div class="ring" style="margin:0 auto">${exr==null?'--':exr+'%'}</div><small>模擬試験 平均</small></div></div>
+  <div style="height:14px"></div><button class="btn" onclick="go(S.E?'paused':'examcfg')">🎯 模擬試験${S.E?'（中断中・再開）':''}</button><div style="height:10px"></div><button class="btn ghost" onclick="S.cfg.sec='all';S.cfg.mode='seq';go('study')">▶ 全問題を学習</button>
   <div class="sec"><span>練習テスト</span><span>${tests().length} 本</span></div>
   ${tests().map(t=>{const st=stat(S.Q.filter(q=>q.test===t));return `<div class="card item" onclick="S.cfg.sec=${t};go('study')"><div class="num">${t}</div><div class="t"><b>練習テスト ${String(t).padStart(2,'0')}</b><small>${st.total} 問 / ${st.done} 解答済み</small><div class="bar light"><i style="width:${st.total?st.done/st.total*100:0}%"></i></div></div>${st.rate!=null?`<div class="pct">${st.rate}%<small>正答率</small></div>`:''}<span style="color:var(--sub)">›</span></div>`}).join('')}
-  <div class="note">模擬試験は次のバージョンで追加予定です</div></main>`},
+  </main>`},
 
 study(){
   const opts=[['seq','📋','順番通り','問題番号順に出題'],['new','✨','未学習','まだ解答していない問題のみ'],['wrong','⚠️','最近不正解','直前の解答が不正解の問題'],['wrong3','🔁','直近3回で不正解','直近3回に1回以上間違えた問題'],['bm','🔖','ブックマーク','ブックマークした問題']];
@@ -94,6 +131,45 @@ result(){const s=S.ses;const n=s.i+(s.done?1:0);
   return `<header><span style="width:44px"></span><h1>結果</h1><span style="width:44px"></span></header><main><div class="card" style="text-align:center"><div class="big" style="font-size:44px;font-weight:800">${n?Math.round(s.ok/n*100):0}%</div><p>${n} 問中 ${s.ok} 問正解</p></div></main>
   <div class="dock"><button class="btn" onclick="go('home')">ホームへ</button></div>`},
 
+examcfg(){return `<header>${back('home')}<h1>模擬試験 設定</h1><span style="width:44px"></span></header><main>
+  <div class="card"><h3>出題数</h3><div class="chips">${[10,20,30,60].map(n=>`<div class="chip ${S.ex.n===n?'on':''}" onclick="S.ex.n=${n};render()">${n} 問</div>`).join('')}</div></div>
+  <div class="card"><h3>制限時間</h3><div class="chips">${[30,60,100].map(n=>`<div class="chip ${S.ex.min===n?'on':''}" onclick="S.ex.min=${n};render()">${n} 分</div>`).join('')}</div><small style="color:var(--sub);display:block;margin-top:10px">本試験の目安: 60 問 / 100 分 / 合格 700/1000（公式で要確認）。合格ラインは 70% で表示します。</small></div>
+  <div class="card"><h3>出題範囲</h3><p style="margin:0">読み込み済み ${S.Q.length} 問からランダム出題（正解は採点まで表示されません）</p></div></main>
+  <div class="dock"><button class="btn" onclick="startExam()">▶ 試験開始</button></div>`},
+
+exam(){const E=S.E,q=byId(E.ids[E.i]),sel=E.ans[E.i]||[],multi=q.answer.length>1,last=E.i===E.ids.length-1;
+  return `<header><button class="ib" onclick="go('examlist')" aria-label="問題一覧">▦</button><h1>模擬試験</h1><button class="ib" onclick="pauseExam()" aria-label="中断">⏸</button></header><main>
+  <div class="timer"><span>⏱ <span id="tm">${fmt(E.left)}</span></span><span style="color:var(--sub)">${E.i+1} / ${E.ids.length}</span></div>
+  <div class="meta"><span class="sp"></span>${q.id}<span onclick="exFlag()" style="font-size:20px;cursor:pointer" role="button" aria-label="フラグ">${E.flag[E.i]?'🚩':'⚑'}</span></div>
+  <div class="card q"><div class="md">${md(q.q)}</div></div>${multi?`<p class="hint">${q.answer.length} つ選択してください</p>`:''}
+  ${q.options.map((t,i)=>`<div class="ans ${sel.includes(i)?'sel':''}" onclick="exAns(${i})"><span class="k">${L[i]}</span><span>${md(t)}</span></div>`).join('')}</main>
+  <div class="dock"><div class="flex"><button class="btn ghost" ${E.i?'':'disabled'} onclick="exMove(-1)">前へ</button>${last?`<button class="btn" onclick="finishExam()">採点する</button>`:`<button class="btn" onclick="exMove(1)">次へ</button>`}</div></div>`},
+
+examlist(){const E=S.E;return `<header>${back('exam')}<h1>問題一覧</h1><button class="tb" onclick="finishExam()">採点</button></header><main>
+  <div class="card"><div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px">${E.ids.map((_,i)=>{const a=!!E.ans[i];return `<div onclick="S.E.i=${i};go('exam')" style="height:48px;border-radius:12px;display:grid;place-items:center;font-weight:700;cursor:pointer;position:relative;border:2px solid ${i===E.i?'var(--pri)':'var(--line)'};background:${a?'var(--pri)':'var(--card)'};color:${a?'#fff':'var(--ink)'}">${i+1}${E.flag[i]?'<span style="position:absolute;top:-6px;right:-4px;font-size:14px">🚩</span>':''}</div>`}).join('')}</div>
+  <p class="note">回答済み ${Object.keys(E.ans).length} / ${E.ids.length}　・　🚩 フラグ ${Object.values(E.flag).filter(Boolean).length}</p></div></main>`},
+
+paused(){const E=S.E,n=Object.keys(E.ans).length,d=new Date(E.pausedAt||Date.now());
+  return `<header>${back('home')}<h1>中断中の試験</h1><span style="width:44px"></span></header><main>
+  <div class="card" style="text-align:center"><div class="bar light"><i style="width:${n/E.ids.length*100}%"></i></div><b style="font-size:20px;display:block;margin-top:14px">${n} / ${E.ids.length}</b></div>
+  <div class="stats"><div class="card">✅<b>${n}</b><small>回答済</small></div><div class="card">⏱<b>${Math.round((E.total-E.left)/60)}分</b><small>経過時間</small></div><div class="card">⏳<b>${Math.ceil(E.left/60)}分</b><small>残り</small></div></div>
+  <p class="note">${d.getMonth()+1}月${d.getDate()}日 ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')} に中断</p>
+  <button class="btn" onclick="resumeExam()">▶ 試験を再開</button><div style="height:10px"></div><button class="btn ghost" onclick="discardExam()">破棄して新しい試験を開始</button></main>`},
+
+examresult(){const r=S.rv,pct=Math.round(r.ok/r.n*100),pass=pct>=70;
+  return `<header><span style="width:44px"></span><h1>試験結果</h1><span style="width:44px"></span></header><main>
+  <div class="card" style="text-align:center"><div style="font-size:48px;font-weight:800;color:${pass?'var(--ok)':'var(--ng)'}">${pct}%</div><b>${pass?'合格ライン到達（70%）':'合格ライン（70%）未達'}</b><p style="color:var(--sub);margin:6px 0 0">${r.n} 問中 ${r.ok} 問正解　・　所要 ${Math.round(r.used/60)} 分</p></div>
+  <div class="sec"><span>問題ごとの結果</span><span>タップで解説</span></div>
+  <div class="card">${r.ids.map((id,i)=>{const ok=isOk(byId(id),r.ans[i]);return `<div class="opt" onclick="reviewQ(${i})"><span>${ok?'✅':(r.ans[i]?'❌':'➖')}</span><div><b>問 ${i+1}</b><small>${esc(byId(id).q.replace(/\*\*/g,'').slice(0,46))}…</small></div><span style="margin-left:auto;color:var(--sub)">›</span></div>`}).join('')}</div></main>
+  <div class="dock"><button class="btn" onclick="go('home')">ホームへ</button></div>`},
+
+review(){const r=S.rv,i=r.cur,q=byId(r.ids[i]),sel=r.ans[i]||[];
+  return `<header>${back('examresult')}<h1>問 ${i+1} / ${r.n}</h1><span style="width:44px"></span></header><main>
+  <div class="card q"><div class="md">${md(q.q)}</div></div>
+  ${q.options.map((t,k)=>{const c=q.answer.includes(k)?(sel.includes(k)?'ok':'miss'):sel.includes(k)?'ng':'';return `<div class="ans ${c}"><span class="k">${L[k]}</span><span>${md(t)}</span></div>`}).join('')}
+  <div class="exp"><b>${isOk(q,sel)?'✅ 正解':'❌ '+(sel.length?'不正解':'未回答')+'（正解: '+q.answer.map(a=>L[a]).join(', ')+'）'}</b><br><br>${md(q.explanation)}${q.tips?`<br><br><b>ポイント</b><br>${md(q.tips)}`:''}</div></main>
+  <div class="dock"><div class="flex"><button class="btn ghost" ${i?'':'disabled'} onclick="reviewQ(${i-1})">前へ</button><button class="btn" ${i<r.n-1?'':'disabled'} onclick="reviewQ(${i+1})">次へ</button></div></div>`},
+
 settings(){return `<header>${back('home')}<h1>設定</h1><span style="width:44px"></span></header><main>
   <div class="card"><h3>問題データ</h3><p style="margin:0 0 12px">${S.Q.length} 問を読み込み済み</p><button class="btn" onclick="pickFile()">問題JSONを読み込む</button><div style="height:10px"></div><button class="btn ghost" onclick="wipe('data')">問題データを削除</button></div>
   <div class="card"><h3>学習履歴</h3><button class="btn ghost" onclick="wipe('progress')">履歴とブックマークを消去</button></div>
@@ -101,7 +177,7 @@ settings(){return `<header>${back('home')}<h1>設定</h1><span style="width:44px
 };
 function render(){$app.innerHTML=`<div class="screen" style="display:flex;flex-direction:column;height:100%;min-height:0">${V[S.route]()}</div>`}
 (async()=>{
-  try{S.Q=(await DB.get('questions'))||[];S.P=(await DB.get('progress'))||S.P;navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){console.warn(e)}
+  try{S.Q=(await DB.get('questions'))||[];S.P=(await DB.get('progress'))||S.P;S.P.exams=S.P.exams||[];S.E=(await DB.get('exam'))||null;if(S.E&&!S.Q.length)S.E=null;navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){console.warn(e)}
   render();
   if('serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
