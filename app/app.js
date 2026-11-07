@@ -169,7 +169,7 @@ const dbar=(name,rate,color)=>`<div class="dbar"><div class="l"><span>${name}</s
 const optRow=(key,val,cur,icon,t,s,fn)=>`<div class="opt ${cur===val?'on':''}" onclick="${fn}"><span class="oi">${ic(icon)}</span><div><b>${t}</b><small>${s}</small></div><span class="radio"></span></div>`;
 function qTags(q){const d=domOf(q),s=secOf(q);return `<span class="tag" ${d?`style="background:${DOM[d].c}"`:''}>${d?DOM[d].n:'—'}</span>${q.answer.length>1?'<span class="tag o">複数選択</span>':'<span class="tag o">単一</span>'}`}
 const optList=(q,cls)=>q.options.map((t,i)=>`<div class="ans ${cls(i)}" onclick="${cls.fn?cls.fn(i):''}"><span class="k">${L[i]}</span><span>${md(t)}</span></div>`).join('');
-const expl=q=>`<div class="exp">${md(q.explanation)}${q.tips?`<br><br><b>ポイント</b><br>${md(q.tips)}`:''}</div>`;
+const expl=q=>!q.explanation?`<div class="exp">この問題には解説がありません（正解のみ収録）。</div>`:`<div class="exp">${md(q.explanation)}${q.tips?`<br><br><b>ポイント</b><br>${md(q.tips)}`:''}</div>`;
 
 // ================= 画面 =================
 const V={
