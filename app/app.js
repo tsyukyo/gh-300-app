@@ -5,11 +5,13 @@ const DB={
   async get(k){const d=await this.open();return new Promise((res,rej)=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)})},
   async set(k,v){const d=await this.open();return new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
 };
-const S={route:'home',Q:[],P:{hist:{},bm:{},exams:[]},E:null,ex:{n:30,min:60},rv:null,ses:null,cfg:{mode:'seq',shuffle:false,sec:'all'},msg:''};
+const S={route:'home',Q:[],P:{hist:{},bm:{},exams:[]},E:null,ex:{n:30,min:60,ratio:'official'},rv:null,ses:null,cfg:{mode:'seq',shuffle:false,sec:'all'},msg:''};
 const $app=document.getElementById('app');
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/^\s*- /gm,'• ').replace(/\n/g,'<br>');
 const L='ABCDEFGHIJ';
+const DOM={1:{n:'責任ある AI の活用',ic:'🛡',w:18},2:{n:'Copilot のプランと機能',ic:'✨',w:28},3:{n:'仕組みとデータの扱い',ic:'🔒',w:13},4:{n:'プロンプトエンジニアリング',ic:'✍️',w:13},5:{n:'開発者のユースケース',ic:'🛠',w:14},6:{n:'テストでの活用',ic:'🧪',w:14}};
+const hasDom=()=>S.Q.some(q=>q.domain);
 const save=()=>DB.set('progress',S.P);
 const go=r=>{S.route=r;render()};
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;$app.append(t);setTimeout(()=>t.remove(),2000)}
@@ -26,7 +28,7 @@ const back=to=>`<button class="ib" onclick="go('${to}')" aria-label="戻る">‹
 
 // ---- 学習対象の選別 ----
 function pick(){
-  let qs=S.cfg.sec==='all'?S.Q:S.Q.filter(q=>q.test===+S.cfg.sec);
+  const sc=S.cfg.sec;let qs=sc==='all'?S.Q:String(sc).startsWith('d')?S.Q.filter(q=>q.domain===+String(sc).slice(1)):S.Q.filter(q=>q.test===+sc);
   const m=S.cfg.mode;
   if(m==='new')qs=qs.filter(q=>!(S.P.hist[q.id]||[]).length);
   if(m==='wrong')qs=qs.filter(q=>lastOk(q.id)===false);
@@ -51,8 +53,18 @@ function bm(id){S.P.bm[id]?delete S.P.bm[id]:S.P.bm[id]=true;save();render()}
 // ---- 模擬試験 ----
 function startExam(){
   if(!S.Q.length){toast('問題データがありません');return}
-  const a=[...S.Q];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}
-  const ids=a.slice(0,Math.min(S.ex.n,a.length)).map(q=>q.id);
+  const shuf=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+  const N=Math.min(S.ex.n,S.Q.length);let ids;
+  if(hasDom()){
+    const ds=[1,2,3,4,5,6],pool={};ds.forEach(d=>pool[d]=shuf(S.Q.filter(q=>q.domain===d)));
+    const w=ds.map(d=>S.ex.ratio==='official'?DOM[d].w:100/6);
+    const tw=w.reduce((a,b)=>a+b,0),raw=w.map(x=>x/tw*N),cnt=raw.map(Math.floor);
+    let rem=N-cnt.reduce((a,b)=>a+b,0);
+    raw.map((r,i)=>[r-Math.floor(r),i]).sort((a,b)=>b[0]-a[0]).forEach(([_,i])=>{if(rem>0){cnt[i]++;rem--}});
+    ids=[];ds.forEach((d,i)=>{ids.push(...pool[d].splice(0,cnt[i]).map(q=>q.id))});
+    const rest=shuf(ds.flatMap(d=>pool[d]).map(q=>q.id));while(ids.length<N&&rest.length)ids.push(rest.shift());
+    ids=shuf(ids);
+  }else ids=shuf(S.Q).slice(0,N).map(q=>q.id);
   S.E={ids,ans:{},flag:{},i:0,left:S.ex.min*60,total:S.ex.min*60,paused:false,at:Date.now()};
   saveE();go('exam');runTick()}
 function runTick(){stopTick();let c=0;tick=setInterval(()=>{if(!S.E)return stopTick();S.E.left--;c++;
@@ -102,9 +114,10 @@ home(){
   if(!S.Q.length)return `<header><span style="width:44px"></span><h1>GH-300 学習</h1><button class="ib" onclick="go('settings')" aria-label="設定">⚙</button></header>
   <main><div class="empty"><div style="font-size:48px">📚</div><h2>問題データがありません</h2><p>問題JSONファイルを読み込むと学習を始められます。</p><div style="height:12px"></div><button class="btn" onclick="pickFile()">問題JSONを読み込む</button></div></main>`;
   const all=stat(S.Q),pct=all.total?all.done/all.total*100:0,ex=S.P.exams||[],exr=ex.length?Math.round(ex.reduce((a,e)=>a+e.ok/e.n,0)/ex.length*100):null;
-  return `<header><button class="ib" onclick="go('settings')" aria-label="設定">⚙</button><h1>GH-300 学習</h1><button class="ib" onclick="S.cfg.mode='bm';S.cfg.sec='all';go('study')" aria-label="ブックマーク">🔖</button></header>
+  return `<header><button class="ib" onclick="go('settings')" aria-label="設定">⚙</button><h1>GH-300 学習</h1><button class="ib" onclick="go('stats')" aria-label="統計">📊</button><button class="ib" onclick="S.cfg.mode='bm';S.cfg.sec='all';go('study')" aria-label="ブックマーク">🔖</button></header>
   <main><div class="hero"><div style="flex:1"><div class="big">${all.done}<small> / ${all.total}</small></div><small>学習済みの問題</small><div class="bar"><i style="width:${pct}%"></i></div><small>${Math.round(pct)}% 完了</small></div><div style="text-align:center"><div class="ring" style="margin:0 auto">${exr==null?'--':exr+'%'}</div><small>模擬試験 平均</small></div></div>
   <div style="height:14px"></div><button class="btn" onclick="go(S.E?'paused':'examcfg')">🎯 模擬試験${S.E?'（中断中・再開）':''}</button><div style="height:10px"></div><button class="btn ghost" onclick="S.cfg.sec='all';S.cfg.mode='seq';go('study')">▶ 全問題を学習</button>
+  ${hasDom()?`<div class="sec"><span>ドメイン</span><span>公式配分</span></div>${[1,2,3,4,5,6].map(d=>{const st=stat(S.Q.filter(q=>q.domain===d));return `<div class="card item" onclick="S.cfg.sec='d${d}';go('study')"><div class="num">${DOM[d].ic}</div><div class="t"><b>D${d} ${DOM[d].n}</b><small>${st.total} 問 / ${st.done} 解答済み　・　${DOM[d].w}%</small><div class="bar light"><i style="width:${st.total?st.done/st.total*100:0}%"></i></div></div>${st.rate!=null?`<div class="pct">${st.rate}%<small>正答率</small></div>`:''}<span style="color:var(--sub)">›</span></div>`}).join('')}`:''}
   <div class="sec"><span>練習テスト</span><span>${tests().length} 本</span></div>
   ${tests().map(t=>{const st=stat(S.Q.filter(q=>q.test===t));return `<div class="card item" onclick="S.cfg.sec=${t};go('study')"><div class="num">${t}</div><div class="t"><b>練習テスト ${String(t).padStart(2,'0')}</b><small>${st.total} 問 / ${st.done} 解答済み</small><div class="bar light"><i style="width:${st.total?st.done/st.total*100:0}%"></i></div></div>${st.rate!=null?`<div class="pct">${st.rate}%<small>正答率</small></div>`:''}<span style="color:var(--sub)">›</span></div>`}).join('')}
   </main>`},
@@ -112,7 +125,7 @@ home(){
 study(){
   const opts=[['seq','📋','順番通り','問題番号順に出題'],['new','✨','未学習','まだ解答していない問題のみ'],['wrong','⚠️','最近不正解','直前の解答が不正解の問題'],['wrong3','🔁','直近3回で不正解','直近3回に1回以上間違えた問題'],['bm','🔖','ブックマーク','ブックマークした問題']];
   const n=pick().length;
-  return `<header>${back('home')}<h1>学習${S.cfg.sec==='all'?'':'（テスト'+S.cfg.sec+'）'}</h1><span style="width:44px"></span></header><main>
+  return `<header>${back('home')}<h1>学習${S.cfg.sec==='all'?'':String(S.cfg.sec).startsWith('d')?'（'+DOM[String(S.cfg.sec).slice(1)].n+'）':'（テスト'+S.cfg.sec+'）'}</h1><span style="width:44px"></span></header><main>
   <div class="card"><h3>学習モード</h3>${opts.map(o=>`<div class="opt ${S.cfg.mode===o[0]?'on':''}" onclick="S.cfg.mode='${o[0]}';render()"><span>${o[1]}</span><div><b>${o[2]}</b><small>${o[3]}</small></div><span class="radio"></span></div>`).join('')}</div>
   <div class="card"><h3>出題順</h3><div class="chips"><div class="chip ${!S.cfg.shuffle?'on':''}" onclick="S.cfg.shuffle=false;render()">順番</div><div class="chip ${S.cfg.shuffle?'on':''}" onclick="S.cfg.shuffle=true;render()">ランダム</div></div></div></main>
   <div class="dock"><button class="btn" ${n?'':'disabled'} onclick="start()">▶ はじめる（${n} 問）</button></div>`},
@@ -134,7 +147,7 @@ result(){const s=S.ses;const n=s.i+(s.done?1:0);
 examcfg(){return `<header>${back('home')}<h1>模擬試験 設定</h1><span style="width:44px"></span></header><main>
   <div class="card"><h3>出題数</h3><div class="chips">${[10,20,30,60].map(n=>`<div class="chip ${S.ex.n===n?'on':''}" onclick="S.ex.n=${n};render()">${n} 問</div>`).join('')}</div></div>
   <div class="card"><h3>制限時間</h3><div class="chips">${[30,60,100].map(n=>`<div class="chip ${S.ex.min===n?'on':''}" onclick="S.ex.min=${n};render()">${n} 分</div>`).join('')}</div><small style="color:var(--sub);display:block;margin-top:10px">本試験の目安: 60 問 / 100 分 / 合格 700/1000（公式で要確認）。合格ラインは 70% で表示します。</small></div>
-  <div class="card"><h3>出題範囲</h3><p style="margin:0">読み込み済み ${S.Q.length} 問からランダム出題（正解は採点まで表示されません）</p></div></main>
+  ${hasDom()?`<div class="card"><h3>ドメイン比率</h3>${[['official','📐','公式配分<span class="pill">推奨</span>','D1:18% D2:28% D3:13% D4:13% D5:14% D6:14%'],['even','⚖️','均等','6 ドメイン均等']].map(o=>`<div class="opt ${S.ex.ratio===o[0]?'on':''}" onclick="S.ex.ratio='${o[0]}';render()"><span>${o[1]}</span><div><b>${o[2]}</b><small>${o[3]}</small></div><span class="radio"></span></div>`).join('')}</div>`:`<div class="card"><h3>出題範囲</h3><p style="margin:0">読み込み済み ${S.Q.length} 問からランダム出題</p></div>`}</main>
   <div class="dock"><button class="btn" onclick="startExam()">▶ 試験開始</button></div>`},
 
 exam(){const E=S.E,q=byId(E.ids[E.i]),sel=E.ans[E.i]||[],multi=q.answer.length>1,last=E.i===E.ids.length-1;
@@ -169,6 +182,17 @@ review(){const r=S.rv,i=r.cur,q=byId(r.ids[i]),sel=r.ans[i]||[];
   ${q.options.map((t,k)=>{const c=q.answer.includes(k)?(sel.includes(k)?'ok':'miss'):sel.includes(k)?'ng':'';return `<div class="ans ${c}"><span class="k">${L[k]}</span><span>${md(t)}</span></div>`}).join('')}
   <div class="exp"><b>${isOk(q,sel)?'✅ 正解':'❌ '+(sel.length?'不正解':'未回答')+'（正解: '+q.answer.map(a=>L[a]).join(', ')+'）'}</b><br><br>${md(q.explanation)}${q.tips?`<br><br><b>ポイント</b><br>${md(q.tips)}`:''}</div></main>
   <div class="dock"><div class="flex"><button class="btn ghost" ${i?'':'disabled'} onclick="reviewQ(${i-1})">前へ</button><button class="btn" ${i<r.n-1?'':'disabled'} onclick="reviewQ(${i+1})">次へ</button></div></div>`},
+
+stats(){const all=stat(S.Q),ex=(S.P.exams||[]).slice(-10).reverse();
+  const rows=hasDom()?[1,2,3,4,5,6].map(d=>({n:`D${d} ${DOM[d].n}`,st:stat(S.Q.filter(q=>q.domain===d))})):tests().map(t=>({n:'練習テスト '+String(t).padStart(2,'0'),st:stat(S.Q.filter(q=>q.test===t))}));
+  const weak=rows.filter(r=>r.st.rate!=null).sort((a,b)=>a.st.rate-b.st.rate)[0];
+  return `<header>${back('home')}<h1>統計</h1><span style="width:44px"></span></header><main>
+  <div class="stats"><div class="card"><b>${all.done}</b><small>解答済み</small></div><div class="card"><b>${all.rate==null?'--':all.rate+'%'}</b><small>正答率</small></div><div class="card"><b>${(S.P.exams||[]).length}</b><small>模擬試験</small></div></div>
+  <div class="sec"><span>${hasDom()?'ドメイン別':'テスト別'}の正答率</span><span>直近の解答ベース</span></div>
+  <div class="card">${rows.map(r=>`<div style="margin:6px 0 14px"><div style="display:flex;justify-content:space-between;font-size:14px"><span>${r.n}</span><b style="color:${r.st.rate==null?'var(--sub)':r.st.rate>=70?'var(--ok)':'var(--acc)'}">${r.st.rate==null?'未学習':r.st.rate+'%'}</b></div><div class="bar light"><i style="width:${r.st.rate||0}%"></i></div><small style="color:var(--sub)">${r.st.done} / ${r.st.total} 問</small></div>`).join('')}
+  ${weak?`<p class="note">最も弱い分野: ${weak.n}（${weak.st.rate}%）</p>`:''}</div>
+  <div class="sec"><span>模擬試験の履歴</span><span>${ex.length?'直近10回':''}</span></div>
+  <div class="card">${ex.length?ex.map(e=>{const p=Math.round(e.ok/e.n*100),d=new Date(e.at);return `<div class="opt"><span>${p>=70?'✅':'❌'}</span><div><b>${p}%（${e.ok} / ${e.n}）</b><small>${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}　所要 ${Math.round(e.used/60)} 分</small></div></div>`}).join(''):'<p class="note">まだ受験していません</p>'}</div></main>`},
 
 settings(){return `<header>${back('home')}<h1>設定</h1><span style="width:44px"></span></header><main>
   <div class="card"><h3>問題データ</h3><p style="margin:0 0 12px">${S.Q.length} 問を読み込み済み</p><button class="btn" onclick="pickFile()">問題JSONを読み込む</button><div style="height:10px"></div><button class="btn ghost" onclick="wipe('data')">問題データを削除</button></div>
