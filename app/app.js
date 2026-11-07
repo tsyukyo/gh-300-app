@@ -11,7 +11,8 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 const md=s=>esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/^\s*- /gm,'• ').replace(/\n/g,'<br>');
 const L='ABCDEFGHIJ';
 const DOM={1:{n:'責任ある AI の活用',ic:'🛡',w:18},2:{n:'Copilot のプランと機能',ic:'✨',w:28},3:{n:'仕組みとデータの扱い',ic:'🔒',w:13},4:{n:'プロンプトエンジニアリング',ic:'✍️',w:13},5:{n:'開発者のユースケース',ic:'🛠',w:14},6:{n:'テストでの活用',ic:'🧪',w:14}};
-const hasDom=()=>S.Q.some(q=>q.domain);
+const KB={1:'責任ある AI と安全な利用',2:'基礎・プラン・主要機能',3:'IDE での Copilot',4:'プロンプトとコンテキスト制御',5:'仕組みとデータフロー',6:'プライバシー・公開コード・除外',7:'管理・ポリシー・ガバナンス',8:'生産性・SDLC・ユースケース',9:'テストでの活用',10:'GitHub.com（PR・レビュー・Issue）',11:'Spaces・ナレッジベース・MCP',12:'エージェント・CLI・メトリクス'};
+const hasDom=()=>S.Q.some(q=>q.domain);const hasKb=()=>S.Q.some(q=>q.kb);
 const save=()=>DB.set('progress',S.P);
 const go=r=>{S.route=r;render()};
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;$app.append(t);setTimeout(()=>t.remove(),2000)}
@@ -28,7 +29,7 @@ const back=to=>`<button class="ib" onclick="go('${to}')" aria-label="戻る">‹
 
 // ---- 学習対象の選別 ----
 function pick(){
-  const sc=S.cfg.sec;let qs=sc==='all'?S.Q:String(sc).startsWith('d')?S.Q.filter(q=>q.domain===+String(sc).slice(1)):S.Q.filter(q=>q.test===+sc);
+  const sc=S.cfg.sec;let qs=sc==='all'?S.Q:String(sc).startsWith('k')?S.Q.filter(q=>q.kb===+String(sc).slice(1)):String(sc).startsWith('d')?S.Q.filter(q=>q.domain===+String(sc).slice(1)):S.Q.filter(q=>q.test===+sc);
   const m=S.cfg.mode;
   if(m==='new')qs=qs.filter(q=>!(S.P.hist[q.id]||[]).length);
   if(m==='wrong')qs=qs.filter(q=>lastOk(q.id)===false);
@@ -118,6 +119,7 @@ home(){
   <main><div class="hero"><div style="flex:1"><div class="big">${all.done}<small> / ${all.total}</small></div><small>学習済みの問題</small><div class="bar"><i style="width:${pct}%"></i></div><small>${Math.round(pct)}% 完了</small></div><div style="text-align:center"><div class="ring" style="margin:0 auto">${exr==null?'--':exr+'%'}</div><small>模擬試験 平均</small></div></div>
   <div style="height:14px"></div><button class="btn" onclick="go(S.E?'paused':'examcfg')">🎯 模擬試験${S.E?'（中断中・再開）':''}</button><div style="height:10px"></div><button class="btn ghost" onclick="S.cfg.sec='all';S.cfg.mode='seq';go('study')">▶ 全問題を学習</button>
   ${hasDom()?`<div class="sec"><span>ドメイン</span><span>公式配分</span></div>${[1,2,3,4,5,6].map(d=>{const st=stat(S.Q.filter(q=>q.domain===d));return `<div class="card item" onclick="S.cfg.sec='d${d}';go('study')"><div class="num">${DOM[d].ic}</div><div class="t"><b>D${d} ${DOM[d].n}</b><small>${st.total} 問 / ${st.done} 解答済み　・　${DOM[d].w}%</small><div class="bar light"><i style="width:${st.total?st.done/st.total*100:0}%"></i></div></div>${st.rate!=null?`<div class="pct">${st.rate}%<small>正答率</small></div>`:''}<span style="color:var(--sub)">›</span></div>`}).join('')}`:''}
+  ${hasKb()?`<div class="sec"><span>知識ベースの章</span><span>${Object.keys(KB).length} 章</span></div>${Object.keys(KB).map(Number).map(k=>{const st=stat(S.Q.filter(q=>q.kb===k));if(!st.total)return '';return `<div class="card item" onclick="S.cfg.sec='k${k}';go('study')"><div class="num">${k}</div><div class="t"><b>${KB[k]}</b><small>${st.total} 問 / ${st.done} 解答済み</small><div class="bar light"><i style="width:${st.done/st.total*100}%"></i></div></div>${st.rate!=null?`<div class="pct">${st.rate}%<small>正答率</small></div>`:''}<span style="color:var(--sub)">›</span></div>`}).join('')}`:''}
   <div class="sec"><span>練習テスト</span><span>${tests().length} 本</span></div>
   ${tests().map(t=>{const st=stat(S.Q.filter(q=>q.test===t));return `<div class="card item" onclick="S.cfg.sec=${t};go('study')"><div class="num">${t}</div><div class="t"><b>練習テスト ${String(t).padStart(2,'0')}</b><small>${st.total} 問 / ${st.done} 解答済み</small><div class="bar light"><i style="width:${st.total?st.done/st.total*100:0}%"></i></div></div>${st.rate!=null?`<div class="pct">${st.rate}%<small>正答率</small></div>`:''}<span style="color:var(--sub)">›</span></div>`}).join('')}
   </main>`},
@@ -125,7 +127,7 @@ home(){
 study(){
   const opts=[['seq','📋','順番通り','問題番号順に出題'],['new','✨','未学習','まだ解答していない問題のみ'],['wrong','⚠️','最近不正解','直前の解答が不正解の問題'],['wrong3','🔁','直近3回で不正解','直近3回に1回以上間違えた問題'],['bm','🔖','ブックマーク','ブックマークした問題']];
   const n=pick().length;
-  return `<header>${back('home')}<h1>学習${S.cfg.sec==='all'?'':String(S.cfg.sec).startsWith('d')?'（'+DOM[String(S.cfg.sec).slice(1)].n+'）':'（テスト'+S.cfg.sec+'）'}</h1><span style="width:44px"></span></header><main>
+  return `<header>${back('home')}<h1>学習${S.cfg.sec==='all'?'':String(S.cfg.sec).startsWith('k')?'（第'+String(S.cfg.sec).slice(1)+'章）':String(S.cfg.sec).startsWith('d')?'（'+DOM[String(S.cfg.sec).slice(1)].n+'）':'（テスト'+S.cfg.sec+'）'}</h1><span style="width:44px"></span></header><main>
   <div class="card"><h3>学習モード</h3>${opts.map(o=>`<div class="opt ${S.cfg.mode===o[0]?'on':''}" onclick="S.cfg.mode='${o[0]}';render()"><span>${o[1]}</span><div><b>${o[2]}</b><small>${o[3]}</small></div><span class="radio"></span></div>`).join('')}</div>
   <div class="card"><h3>出題順</h3><div class="chips"><div class="chip ${!S.cfg.shuffle?'on':''}" onclick="S.cfg.shuffle=false;render()">順番</div><div class="chip ${S.cfg.shuffle?'on':''}" onclick="S.cfg.shuffle=true;render()">ランダム</div></div></div></main>
   <div class="dock"><button class="btn" ${n?'':'disabled'} onclick="start()">▶ はじめる（${n} 問）</button></div>`},
@@ -133,7 +135,7 @@ study(){
 q(){const s=S.ses,q=s.qs[s.i],multi=q.answer.length>1;
   return `<header>${back('home').replace('‹','⌂')}<h1>練習テスト ${String(q.test).padStart(2,'0')}</h1><button class="tb" onclick="go('result')">終了</button></header><main>
   <div class="timer" style="font-weight:500;color:var(--sub)"><span>${s.i+1} / ${s.qs.length}</span><span>${q.id}</span></div><div class="bar light" style="margin:8px 0 12px"><i style="width:${(s.i+1)/s.qs.length*100}%"></i></div>
-  <div class="meta"><span class="sp"></span><span onclick="bm('${q.id}')" style="font-size:22px;cursor:pointer" role="button" aria-label="ブックマーク">${S.P.bm[q.id]?'🔖':'📑'}</span></div>
+  <div class="meta">${q.kb?`<span class="tag">第${q.kb}章 ${KB[q.kb]}</span>`:''}<span class="sp"></span><span onclick="bm('${q.id}')" style="font-size:22px;cursor:pointer" role="button" aria-label="ブックマーク">${S.P.bm[q.id]?'🔖':'📑'}</span></div>
   <div class="card q"><div class="md">${md(q.q)}</div></div>${multi?`<p class="hint">${q.answer.length} つ選択してください</p>`:''}
   ${q.options.map((t,i)=>{let c='';if(s.done){c=q.answer.includes(i)?(s.sel.includes(i)?'ok':'miss'):s.sel.includes(i)?'ng':''}else if(s.sel.includes(i))c='sel';
     return `<div class="ans ${c}" onclick="toggle(${i})"><span class="k">${L[i]}</span><span>${md(t)}</span></div>`}).join('')}
