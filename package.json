@@ -1,0 +1,11 @@
+{
+  "name": "gh-300-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GH-300学習アプリ（CapacitorでラップしたiOS版）",
+  "dependencies": {
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/ios": "^7.0.0"
+  }
+}
